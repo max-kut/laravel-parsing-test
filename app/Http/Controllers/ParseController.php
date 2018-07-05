@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use MenaraSolutions\Geographer\Earth;
+use morphos\Russian\GeographicalNamesInflection;
 use Symfony\Component\DomCrawler\Crawler;
 
 class ParseController extends Controller
@@ -24,6 +26,13 @@ class ParseController extends Controller
         'th',
         'td',
     ];
+    
+    private $earth;
+    
+    // public function __construct(Earth $earth)
+    // {
+    //     $this->earth = $earth;
+    // }
     
     /**
      * @param \Illuminate\Http\Request $request
@@ -52,7 +61,14 @@ class ParseController extends Controller
         try {
             $content = file_get_contents($url);
             
-            return $this->getBlockContent($content, $attributes);
+            $text = $this->getBlockContent($content, $attributes);
+            
+            $cities = $this->getCities($text);
+            
+            return [
+                'text'   => $text,
+                'cities' => $cities,
+            ];
         } catch (\Exception $e) {
             // return "Url недоступен";
             return print_r($e, 1);
@@ -159,7 +175,7 @@ class ParseController extends Controller
     {
         return preg_replace_callback_array([
             // лишние пробелы
-            '/(>?)\s{2,}(<?)/iu' => function ($matches) {
+            '/(>?)\s{2,}(<?)/iu'      => function ($matches) {
                 if (!empty($matches[1]) || !empty($matches[2])) {
                     return $matches[1] . $matches[2];
                 }
@@ -167,7 +183,7 @@ class ParseController extends Controller
                 return " ";
             },
             // теги
-            '/<\/?(\w+)(\s[^>])*>/iu'     => function ($matches) {
+            '/<\/?(\w+)(\s[^>])*>/iu' => function ($matches) {
                 // если тег в списке разрешенных, то оставим все как есть
                 if (in_array(mb_strtolower($matches[1]), self::RESOLVE_TAGS)) {
                     return $matches[0];
@@ -180,5 +196,26 @@ class ParseController extends Controller
                 return $matches[0][1] === '/' ? " " : "";
             },
         ], $blockContent);
+    }
+    
+    /**
+     * @param string $text
+     *
+     * @return array
+     */
+    private function getCities(string $text): array
+    {
+        $cities = [];
+        if (($handle = fopen(storage_path('app/cities.csv'), "r")) !== false) {
+            while (($data = fgetcsv($handle, 1000, ';')) !== false) {
+                $cityMatch = implode('|', array_unique($data));
+                if (preg_match("/(?<=^|\s)({$cityMatch})(?=\s|$)/iu", $text)) {
+                    $cities[] = $data[0];
+                }
+            }
+            fclose($handle);
+        }
+        
+        return array_unique($cities);
     }
 }

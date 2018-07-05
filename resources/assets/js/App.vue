@@ -30,6 +30,10 @@
             <div v-else
                  class="result"
                  v-html="result"></div>
+
+            <ul v-if="cities && cities.length">
+                <li v-for="city in cities" :key="city">{{ city }}</li>
+            </ul>
         </div>
     </div>
 </template>
@@ -41,6 +45,7 @@
         data: () => ({
             query: "",
             result: "",
+            cities: [],
             isPre: false
         }),
         computed: {},
@@ -51,13 +56,15 @@
                     return
                 }
                 this.result = "";
+                this.cities = [];
                 axios.get('/parse', {
                     params: {
                         parseQuery: this.query
                     }
                 }).then(res => {
                     console.log(res);
-                    this.result = res.data
+                    this.result = res.data.text;
+                    this.cities = res.data.cities;
                 }).catch(err => {
                     console.log(err);
                 });
